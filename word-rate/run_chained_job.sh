@@ -1,29 +1,39 @@
 #!/usr/bin/env bash
 
-WORD_COUNT_OUTPUT_DIR="word_count_result"
-WORD_RATE_OUTPUT_DIR="word_rate_result"
+JOB_NAME_WORD_COUNT="word_count"
+INPUT_DIR="${JOB_NAME_WORD_COUNT}/input"
+OUTPUT_DIR_WORD_COUNT="${JOB_NAME_WORD_COUNT}/output"
 
-hdfs dfs -rm -r -skipTrash ${WORD_COUNT_OUTPUT_DIR}
-hdfs dfs -rm -r -skipTrash ${WORD_RATE_OUTPUT_DIR}
+HADOOP_STREAMING_JAR=${HADOOP_HOME}/share/hadoop/tools/lib/hadoop-streaming-2.8.4.jar
 
-yarn jar ${HADOOP_HOME}/share/hadoop/tools/lib/hadoop-streaming-2.8.4.jar \
-    -D mapred.jab.name="word-count" \
+hdfs dfs -mkdir -p ${INPUT_DIR}
+hdfs dfs -put -f ../data/98-0.txt ${INPUT_DIR}
+hdfs dfs -rm -r -skipTrash ${OUTPUT_DIR_WORD_COUNT}
+
+yarn jar ${HADOOP_STREAMING_JAR} \
+    -D mapred.jab.name=${JOB_NAME_WORD_COUNT} \
     -D mapreduce.job.reduces=2 \
     -files word_count_mapper.py,word_count_reducer.py \
     -mapper "python word_count_mapper.py" \
     -reducer "python word_count_reducer.py" \
-    -input /data/word_count \
-    -output ${WORD_COUNT_OUTPUT_DIR}
+    -input ${INPUT_DIR} \
+    -output ${OUTPUT_DIR_WORD_COUNT}
 
-hdfs dfs -cat ${WORD_COUNT_OUTPUT_DIR}/part-00000 | head
+hdfs dfs -cat ${OUTPUT_DIR_WORD_COUNT}/part-00000 | head
 
-yarn jar ${HADOOP_HOME}/share/hadoop/tools/lib/hadoop-streaming-2.8.4.jar \
-    -D mapred.jab.name="word-rate" \
+
+JOB_NAME_WORD_RATE="word_rate"
+OUTPUT_DIR_WORD_RATE="${JOB_NAME_WORD_RATE}/output"
+
+hdfs dfs -rm -r -skipTrash ${OUTPUT_DIR_WORD_RATE}
+
+yarn jar ${HADOOP_STREAMING_JAR} \
+    -D mapred.jab.name=${JOB_NAME_WORD_RATE} \
     -D mapreduce.job.reduces=1 \
     -files word_rate_reducer.py \
     -mapper "cat" \
     -reducer "python word_rate_reducer.py" \
-    -input ${WORD_COUNT_OUTPUT_DIR} \
-    -output ${WORD_RATE_OUTPUT_DIR}
+    -input ${OUTPUT_DIR_WORD_COUNT} \
+    -output ${OUTPUT_DIR_WORD_RATE}
 
-hdfs dfs -cat ${WORD_RATE_OUTPUT_DIR}/part-00000 | head
+hdfs dfs -cat ${OUTPUT_DIR_WORD_RATE}/part-00000 | head
